@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
+import './styles.css'; // Import the stylesheet
 
 const GraphWarsGame = () => {
   const NEUTRAL = 0;

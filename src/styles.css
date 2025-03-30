@@ -1,0 +1,292 @@
+/* src/styles.css */
+
+/* Reset default styles and set a retro-futuristic base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Press Start 2P', monospace; /* Retro pixel font */
+}
+
+/* Body with a dark, cyberpunk background */
+body {
+  background: linear-gradient(45deg, #1a0b2e, #0f172a); /* Deep purple to dark blue gradient */
+  color: #e0e0e0; /* Light gray text for readability */
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: auto;
+  position: relative;
+}
+
+/* Retro-futuristic overlay with a subtle scanline effect */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    transparent 0%,
+    transparent 2px,
+    rgba(0, 255, 255, 0.05) 2px,
+    rgba(0, 255, 255, 0.05) 4px
+  ); /* Cyan scanlines */
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Main container */
+div {
+  text-align: center;
+  z-index: 2;
+}
+
+/* Title with neon glow */
+h2 {
+  font-size: 2.5rem;
+  color: #ff00ff; /* Neon magenta */
+  text-shadow: 
+    0 0 5px #ff00ff,
+    0 0 10px #ff00ff,
+    0 0 20px #00ffff; /* Cyan glow */
+  margin-bottom: 1rem;
+  animation: flicker 3s infinite;
+}
+
+/* Flicker animation for neon effect */
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    opacity: 1;
+    text-shadow: 
+      0 0 5px #ff00ff,
+      0 0 10px #ff00ff,
+      0 0 20px #00ffff;
+  }
+  20%, 24%, 55% {
+    opacity: 0.8;
+    text-shadow: 
+      0 0 2px #ff00ff,
+      0 0 5px #ff00ff,
+      0 0 10px #00ffff;
+  }
+}
+
+/* Team counts and messages */
+.text-lg {
+  font-size: 1.2rem;
+  color: #00ffff; /* Neon cyan */
+  text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff;
+  margin-bottom: 0.5rem;
+}
+
+/* Game over and instructional text */
+.text-xl, .text-sm {
+  font-size: 1.5rem;
+  color: #ff00ff; /* Neon magenta */
+  text-shadow: 0 0 5px #ff00ff, 0 0 10px #ff00ff;
+  margin-bottom: 0.5rem;
+}
+
+.text-sm {
+  font-size: 0.8rem;
+  color: #00ff00; /* Neon green */
+  text-shadow: 0 0 5px #00ff00;
+}
+
+/* Canvas styling with retro CRT effect */
+canvas {
+  border: 4px solid #00ff00; /* Neon green border */
+  border-radius: 10px;
+  box-shadow: 
+    0 0 10px #00ff00,
+    0 0 20px #00ff00,
+    inset 0 0 10px #00ff00;
+  background: #0a0a0a; /* Slightly lighter black for contrast */
+  margin-bottom: 1rem;
+  filter: brightness(1.1) contrast(1.2); /* Enhance visibility */
+}
+
+/* Buttons container */
+.flex-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+/* Retro button styling */
+button {
+  background: #1a1a1a; /* Dark gray */
+  color: #00ff00; /* Neon green text */
+  border: 2px solid #00ff00;
+  border-radius: 5px;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  text-transform: uppercase;
+  text-shadow: 0 0 5px #00ff00;
+  box-shadow: 0 0 5px #00ff00;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+/* Hover effect for buttons */
+button:hover:not(:disabled) {
+  background: #00ff00;
+  color: #1a1a1a;
+  text-shadow: none;
+  box-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+}
+
+/* Disabled button styling */
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: #666;
+  color: #666;
+  text-shadow: none;
+  box-shadow: none;
+}
+
+/* Selected difficulty button (blue) */
+.bg-blue-600 {
+  background: #00b7eb; /* Neon blue */
+  color: #1a1a1a;
+  border-color: #00b7eb;
+  text-shadow: none;
+  box-shadow: 0 0 10px #00b7eb, 0 0 20px #00b7eb;
+}
+
+/* Other button colors */
+.bg-gray-700 {
+  background: #1a1a1a;
+  border-color: #666;
+  color: #666;
+  text-shadow: 0 0 5px #666;
+}
+
+.bg-gray-700:hover:not(:disabled) {
+  background: #666;
+  color: #1a1a1a;
+  text-shadow: none;
+  box-shadow: 0 0 10px #666, 0 0 20px #666;
+}
+
+.bg-green-700 {
+  background: #1a1a1a;
+  border-color: #00ff00;
+  color: #00ff00;
+}
+
+.bg-green-700:hover:not(:disabled) {
+  background: #00ff00;
+  color: #1a1a1a;
+}
+
+.bg-purple-700 {
+  background: #1a1a1a;
+  border-color: #ff00ff;
+  color: #ff00ff;
+  text-shadow: 0 0 5px #ff00ff;
+}
+
+.bg-purple-700:hover:not(:disabled) {
+  background: #ff00ff;
+  color: #1a1a1a;
+  text-shadow: none;
+  box-shadow: 0 0 10px #ff00ff, 0 0 20px #ff00ff;
+}
+
+/* Input field for multiplayer room ID */
+input[type="text"] {
+  background: #0a0a0a;
+  color: #00ff00;
+  border: 2px solid #00ff00;
+  border-radius: 5px;
+  padding: 0.5rem;
+  font-size: 1rem;
+  text-align: center;
+  box-shadow: 0 0 5px #00ff00;
+  margin-right: 0.5rem;
+}
+
+input[type="text"]::placeholder {
+  color: #00ff0055;
+}
+
+/* Focus effect for input */
+input[type="text"]:focus {
+  outline: none;
+  box-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+}
+
+/* Player count in multiplayer */
+div:not(.flex-wrap) > div:last-child {
+  font-size: 1rem;
+  color: #ff00ff;
+  text-shadow: 0 0 5px #ff00ff;
+}
+
+/* Firebase Auth UI (adjust as needed for your setup) */
+#loginContainer, #userInfo {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+}
+
+#loginContainer button, #userInfo button {
+  background: #1a1a1a;
+  border-color: #ff00ff;
+  color: #ff00ff;
+}
+
+#loginContainer button:hover, #userInfo button:hover {
+  background: #ff00ff;
+  color: #1a1a1a;
+}
+
+#loginModal {
+  background: rgba(0, 0, 0, 0.8);
+  color: #00ff00;
+}
+
+.modal-content {
+  background: #1a1a1a;
+  border: 2px solid #00ff00;
+  box-shadow: 0 0 10px #00ff00;
+}
+
+#leaderboard-container {
+  position: fixed;
+  right: 10px;
+  top: 50px;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 10px;
+  border: 2px solid #ff00ff;
+  border-radius: 5px;
+  box-shadow: 0 0 10px #ff00ff;
+  max-width: 250px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+#leaderboard h2 {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+#leaderboard-list li {
+  color: #00ff00;
+  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
+}
+
+/* Highlight current user's score */
+#leaderboard-list li[style*="color: rgb(255, 215, 0)"] {
+  color: #ffd700;
+  text-shadow: 0 0 5px #ffd700;
+}
