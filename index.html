@@ -1,0 +1,909 @@
+import React, { useState, useEffect, useRef } from 'react';
+
+const NetworkWarsGame = () => {
+  // Constants
+  const NEUTRAL = 0;
+  const PLAYER_TEAM = 1; // Red
+  const AI_TEAM_1 = 2;   // Blue
+  const AI_TEAM_2 = 3;   // Green
+  const AI_TEAM_3 = 4;   // Purple
+  
+  const NODE_SIZE = 10;
+  const CONNECTION_PROBABILITY = {
+    easy: 0.12,    // Still fewer than original but not too sparse
+    medium: 0.09,
+    hard: 0.07     // Challenging but not impossible
+  };
+  
+  // Team colors
+  const TEAM_COLORS = {
+    [NEUTRAL]: { fill: '#cccccc', stroke: '#666666', name: 'Neutral' },
+    [PLAYER_TEAM]: { fill: '#ff3333', stroke: '#ff6666', name: 'Red (You)' },
+    [AI_TEAM_1]: { fill: '#3333ff', stroke: '#6666ff', name: 'Blue AI' },
+    [AI_TEAM_2]: { fill: '#33cc33', stroke: '#66ff66', name: 'Green AI' },
+    [AI_TEAM_3]: { fill: '#cc33cc', stroke: '#ff66ff', name: 'Purple AI' }
+  };
+  
+  // State
+  const [nodes, setNodes] = useState([]);
+  const [connections, setConnections] = useState([]);
+  const [teamCounts, setTeamCounts] = useState({});
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [gameOver, setGameOver] = useState(false);
+  const [winner, setWinner] = useState(null);
+  const [gameMessage, setGameMessage] = useState("Your turn! Select a node to move from.");
+  const [turnNumber, setTurnNumber] = useState(1);
+  const [playerTurn, setPlayerTurn] = useState(true);
+  const [movingTroops, setMovingTroops] = useState(null);
+  const [difficulty, setDifficulty] = useState('medium'); // easy, medium, hard
+  const [rotation, setRotation] = useState({ x: 0, y: 0 });
+  const [isRotating, setIsRotating] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const canvasRef = useRef(null);
+  
+  // Initialize network
+  useEffect(() => {
+    initializeNetwork(30);
+  }, []);
+  
+  // Animation loop
+  useEffect(() => {
+    const renderLoop = () => {
+      renderNetwork();
+      requestAnimationFrame(renderLoop);
+    };
+    
+    const animationId = requestAnimationFrame(renderLoop);
+    return () => cancelAnimationFrame(animationId);
+  }, [nodes, connections, selectedNode, movingTroops, playerTurn, rotation]);
+  
+  // Initialize network
+  const initializeNetwork = (numNodes = 30) => {
+    // Create nodes
+    const newNodes = [];
+    for (let i = 0; i < numNodes; i++) {
+      // Create nodes in 3D space (x, y, z)
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI;
+      const radius = Math.random() * 100 + 100;
+      
+      // Convert spherical to cartesian coordinates for more natural 3D distribution
+      const x = radius * Math.sin(phi) * Math.cos(theta);
+      const y = radius * Math.sin(phi) * Math.sin(theta);
+      const z = radius * Math.cos(phi);
+      
+      newNodes.push({
+        position: {
+          x: x,
+          y: y,
+          z: z
+        },
+        team: NEUTRAL,
+        troops: Math.floor(Math.random() * 3) + 1, // 1-3 troops for neutral nodes
+        connections: [],
+        resourceValue: Math.random() * 0.7 + 0.3 // Resource generation value (0.3-1.0)
+      });
+    }
+    
+    // Create connections based on difficulty
+    const newConnections = [];
+    const connectionProb = CONNECTION_PROBABILITY[difficulty];
+    
+    for (let i = 0; i < newNodes.length; i++) {
+      for (let j = i + 1; j < newNodes.length; j++) {
+        if (Math.random() < connectionProb) {
+          newConnections.push({
+            nodeA: i,
+            nodeB: j
+          });
+          
+          newNodes[i].connections.push(newConnections.length - 1);
+          newNodes[j].connections.push(newConnections.length - 1);
+        }
+      }
+    }
+    
+    // Ensure all nodes have at least one connection
+    // First identify isolated nodes
+    const isolatedNodes = [];
+    for (let i = 0; i < newNodes.length; i++) {
+      if (newNodes[i].connections.length === 0) {
+        isolatedNodes.push(i);
+      }
+    }
+    
+    // Connect isolated nodes to nearest node
+    for (const isolatedNodeIdx of isolatedNodes) {
+      let nearestNodeIdx = -1;
+      let minDistance = Infinity;
+      
+      // Find the nearest node
+      for (let i = 0; i < newNodes.length; i++) {
+        if (i !== isolatedNodeIdx) {
+          const dx = newNodes[i].position.x - newNodes[isolatedNodeIdx].position.x;
+          const dy = newNodes[i].position.y - newNodes[isolatedNodeIdx].position.y;
+          const dz = newNodes[i].position.z - newNodes[isolatedNodeIdx].position.z;
+          const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+          
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearestNodeIdx = i;
+          }
+        }
+      }
+      
+      // Create connection to nearest node
+      if (nearestNodeIdx !== -1) {
+        newConnections.push({
+          nodeA: isolatedNodeIdx,
+          nodeB: nearestNodeIdx
+        });
+        
+        newNodes[isolatedNodeIdx].connections.push(newConnections.length - 1);
+        newNodes[nearestNodeIdx].connections.push(newConnections.length - 1);
+      }
+    }
+    
+    // Initialize starting positions for each team
+    const playerStartNode = Math.floor(Math.random() * newNodes.length);
+    let ai1StartNode, ai2StartNode, ai3StartNode;
+    
+    // Distribute teams around the network
+    do {
+      ai1StartNode = Math.floor(Math.random() * newNodes.length);
+    } while (ai1StartNode === playerStartNode);
+    
+    do {
+      ai2StartNode = Math.floor(Math.random() * newNodes.length);
+    } while (ai2StartNode === playerStartNode || ai2StartNode === ai1StartNode);
+    
+    do {
+      ai3StartNode = Math.floor(Math.random() * newNodes.length);
+    } while (ai3StartNode === playerStartNode || ai3StartNode === ai1StartNode || ai3StartNode === ai2StartNode);
+    
+    // AI difficulty settings - more balanced
+    const aiStartingTroops = {
+      easy: 6,
+      medium: 7,
+      hard: 8
+    };
+    
+    const playerStartingTroops = {
+      easy: 8,
+      medium: 7,
+      hard: 6
+    };
+    
+    // Give starting nodes troops based on difficulty
+    newNodes[playerStartNode].team = PLAYER_TEAM;
+    newNodes[playerStartNode].troops = playerStartingTroops[difficulty];
+    
+    newNodes[ai1StartNode].team = AI_TEAM_1;
+    newNodes[ai1StartNode].troops = aiStartingTroops[difficulty];
+    
+    newNodes[ai2StartNode].team = AI_TEAM_2;
+    newNodes[ai2StartNode].troops = aiStartingTroops[difficulty];
+    
+    newNodes[ai3StartNode].team = AI_TEAM_3;
+    newNodes[ai3StartNode].troops = aiStartingTroops[difficulty];
+    
+    setNodes(newNodes);
+    setConnections(newConnections);
+    updateTeamCounts(newNodes);
+    setRotation({ x: 0, y: 0 });
+  };
+  
+  // Update team counts
+  const updateTeamCounts = (currentNodes = nodes) => {
+    const counts = {
+      [PLAYER_TEAM]: 0,
+      [AI_TEAM_1]: 0,
+      [AI_TEAM_2]: 0,
+      [AI_TEAM_3]: 0,
+      [NEUTRAL]: 0
+    };
+    
+    currentNodes.forEach(node => {
+      counts[node.team]++;
+    });
+    
+    setTeamCounts(counts);
+  };
+  
+  // Handle mouse events for rotation
+  const handleMouseDown = (e) => {
+    if (e.button === 2) { // Right mouse button
+      setIsRotating(true);
+      setDragStart({ x: e.clientX, y: e.clientY });
+      e.preventDefault();
+      return;
+    }
+    
+    // Left button is for node selection/interaction
+    handleCanvasClick(e);
+  };
+  
+  const handleMouseMove = (e) => {
+    if (!isRotating) return;
+    
+    const deltaX = e.clientX - dragStart.x;
+    const deltaY = e.clientY - dragStart.y;
+    
+    setRotation({
+      x: rotation.x + deltaY * 0.005,
+      y: rotation.y + deltaX * 0.005
+    });
+    
+    setDragStart({ x: e.clientX, y: e.clientY });
+  };
+  
+  const handleMouseUp = () => {
+    setIsRotating(false);
+  };
+  
+  const handleMouseLeave = () => {
+    setIsRotating(false);
+  };
+  
+  const handleContextMenu = (e) => {
+    e.preventDefault(); // Prevent context menu from appearing on right-click
+  };
+  
+  // Handle canvas click
+  const handleCanvasClick = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Find if any node was clicked
+    // First get all nodes with their projections
+    const nodeProjections = nodes.map((node, index) => {
+      const projected = rotatePoint(node.position.x, node.position.y, node.position.z);
+      return { node, index, projected };
+    }).sort((a, b) => b.projected.z - a.projected.z); // Sort back-to-front
+    
+    // Then check from front to back (important for proper picking in 3D)
+    for (const { node, index, projected } of nodeProjections) {
+      if (projected.z < -300) continue; // Skip nodes behind camera
+      
+      const nodeX = projected.x;
+      const nodeY = projected.y;
+      const scaledSize = NODE_SIZE * projected.scale;
+      
+      const dx = x - nodeX;
+      const dy = y - nodeY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance <= scaledSize) {
+        handleNodeClick(index);
+        break;
+      }
+    }
+  };
+  
+  // Handle node click
+  const handleNodeClick = (nodeIndex) => {
+    if (gameOver || !playerTurn) return;
+    
+    const clickedNode = nodes[nodeIndex];
+    
+    // If no node is selected yet
+    if (selectedNode === null) {
+      // Can only select your own nodes with at least 2 troops
+      if (clickedNode.team === PLAYER_TEAM) {
+        if (clickedNode.troops < 2) {
+          setGameMessage("This node needs at least 2 troops to move from.");
+        } else {
+          setSelectedNode(nodeIndex);
+          setGameMessage("Node selected. Click a connected node to move troops.");
+        }
+      } else {
+        setGameMessage("You can only select your own nodes.");
+      }
+    } 
+    // If a node is already selected
+    else {
+      // Deselect if clicking the same node
+      if (selectedNode === nodeIndex) {
+        setSelectedNode(null);
+        setGameMessage("Selection cleared. Select a node to move from.");
+        return;
+      }
+      
+      // Check if target is connected to selected node
+      const sourceNode = nodes[selectedNode];
+      const isConnected = sourceNode.connections.some(connIndex => {
+        const conn = connections[connIndex];
+        return (conn.nodeA === selectedNode && conn.nodeB === nodeIndex) ||
+               (conn.nodeB === selectedNode && conn.nodeA === nodeIndex);
+      });
+      
+      if (!isConnected) {
+        setGameMessage("You can only move to connected nodes!");
+        return;
+      }
+      
+      // Move or attack
+      executeTroopMovement(selectedNode, nodeIndex);
+    }
+  };
+  
+  // Execute troop movement or attack
+  const executeTroopMovement = (sourceIdx, targetIdx) => {
+    const updatedNodes = [...nodes];
+    const sourceNode = updatedNodes[sourceIdx];
+    const targetNode = updatedNodes[targetIdx];
+    
+    // Determine troops to move (half, leaving at least 1 behind)
+    const troopsToMove = Math.max(1, Math.floor(sourceNode.troops / 2));
+    
+    // Remove troops from source
+    sourceNode.troops -= troopsToMove;
+    
+    // If moving to own node, just add troops
+    if (targetNode.team === PLAYER_TEAM) {
+      targetNode.troops += troopsToMove;
+      setGameMessage(`Moved ${troopsToMove} troops to your node.`);
+    } 
+    // If attacking, resolve battle
+    else {
+      const attackStrength = troopsToMove;
+      const defenseStrength = targetNode.troops;
+      
+      if (attackStrength > defenseStrength) {
+        // Attacker wins
+        const remainingTroops = Math.max(1, troopsToMove - Math.floor(defenseStrength * 0.8));
+        targetNode.team = PLAYER_TEAM;
+        targetNode.troops = remainingTroops;
+        setGameMessage(`Attack successful! Captured with ${remainingTroops} troops remaining.`);
+      } else {
+        // Defender holds, but with losses
+        targetNode.troops = Math.max(1, defenseStrength - Math.floor(attackStrength * 0.8));
+        setGameMessage(`Attack failed! Enemy has ${targetNode.troops} troops remaining.`);
+      }
+    }
+    
+    setNodes(updatedNodes);
+    setSelectedNode(null);
+    updateTeamCounts(updatedNodes);
+  };
+  
+  // End player turn
+  const endTurn = () => {
+    setPlayerTurn(false);
+    setSelectedNode(null);
+    setTurnNumber(prev => prev + 1);
+    setGameMessage("AI taking their turns...");
+    
+    // Add troops to player nodes based on difficulty - more balanced
+    const playerTroopGain = {
+      easy: 2,    // More troops on easy
+      medium: 1,  // Standard troops on medium
+      hard: 1     // Same troops but AIs get more on hard
+    };
+    
+    const updatedNodes = [...nodes];
+    updatedNodes.forEach(node => {
+      if (node.team === PLAYER_TEAM) {
+        node.troops += playerTroopGain[difficulty];
+      }
+    });
+    
+    setNodes(updatedNodes);
+    
+    // Simulate AI turns
+    setTimeout(() => {
+      simulateAITurns();
+    }, 500);
+  };
+  
+  // Simulate AI turns
+  const simulateAITurns = () => {
+    // Process each AI team
+    const teams = [AI_TEAM_1, AI_TEAM_2, AI_TEAM_3];
+    let updatedNodes = [...nodes];
+    
+    // AI troops gain based on difficulty - more balanced
+    const aiTroopGain = {
+      easy: 1,    // Standard gain on easy
+      medium: 1,  // Same on medium
+      hard: 1.5   // Slightly more on hard (rounded up)
+    };
+    
+    // First add troops to all AI nodes
+    updatedNodes.forEach(node => {
+      if (node.team !== PLAYER_TEAM && node.team !== NEUTRAL) {
+        if (difficulty === 'hard') {
+          // For hard difficulty, every other turn gives 2 troops instead of 1
+          node.troops += (turnNumber % 2 === 0) ? 2 : 1;
+        } else {
+          node.troops += aiTroopGain[difficulty];
+        }
+      }
+    });
+    
+    setNodes(updatedNodes);
+    
+    // Then each AI team makes its moves
+    for (const team of teams) {
+      setTimeout(() => {
+        makeAIMove(team);
+      }, 300);
+    }
+    
+    // Back to player turn
+    setTimeout(() => {
+      setPlayerTurn(true);
+      setGameMessage("Your turn! Select a node to move from.");
+    }, 1200);
+  };
+  
+  // Make a move for an AI team
+  const makeAIMove = (team) => {
+    const updatedNodes = [...nodes];
+    
+    // Get all nodes owned by this team
+    const teamNodes = updatedNodes
+      .map((node, index) => ({ node, index }))
+      .filter(({ node }) => node.team === team && node.troops >= 2);
+    
+    if (teamNodes.length === 0) return; // No valid moves
+    
+    // AI aggression based on difficulty - more balanced
+    const aiAggression = {
+      easy: 0.5,     // Less likely to attack
+      medium: 0.7,   // Moderate aggression
+      hard: 0.8      // Very aggressive
+    };
+    
+    // Number of moves per turn based on difficulty - more balanced
+    const movesPerTurn = {
+      easy: 1,
+      medium: 1,
+      hard: 2
+    };
+    
+    // Make multiple moves based on difficulty
+    for (let move = 0; move < movesPerTurn[difficulty]; move++) {
+      if (teamNodes.length === 0) break;
+      
+      // Pick a random node to move from
+      const sourceNodeData = teamNodes[Math.floor(Math.random() * teamNodes.length)];
+      const sourceIndex = sourceNodeData.index;
+      const sourceNode = sourceNodeData.node;
+      
+      // Get all connected nodes
+      const connectedNodeIndices = sourceNode.connections
+        .map(connIndex => {
+          const conn = connections[connIndex];
+          return conn.nodeA === sourceIndex ? conn.nodeB : conn.nodeA;
+        });
+      
+      // Filter to attackable nodes (not same team)
+      const attackableIndices = connectedNodeIndices.filter(idx => 
+        updatedNodes[idx].team !== team
+      );
+      
+      // If can attack, do it
+      if (attackableIndices.length > 0 && Math.random() < aiAggression[difficulty]) {
+        // Prioritize player nodes based on difficulty
+        const playerPriority = {
+          easy: 0.3,    // Less focused on player
+          medium: 0.6,  // Moderate focus
+          hard: 0.8     // Highly focused on player
+        };
+        
+        let targetIndex;
+        
+        // Determine if AI focuses on player
+        if (Math.random() < playerPriority[difficulty]) {
+          // Look for player nodes
+          const playerNodeIndices = attackableIndices.filter(idx => 
+            updatedNodes[idx].team === PLAYER_TEAM
+          );
+          
+          // If player nodes found, target them, otherwise pick random target
+          if (playerNodeIndices.length > 0) {
+            targetIndex = playerNodeIndices[Math.floor(Math.random() * playerNodeIndices.length)];
+          } else {
+            targetIndex = attackableIndices[Math.floor(Math.random() * attackableIndices.length)];
+          }
+        } else {
+          // Random target
+          targetIndex = attackableIndices[Math.floor(Math.random() * attackableIndices.length)];
+        }
+        
+        const targetNode = updatedNodes[targetIndex];
+        
+        // Move troops based on difficulty - more balanced
+        let troopPercentage;
+        if (difficulty === 'easy') {
+          troopPercentage = 0.5; // Send half troops
+        } else if (difficulty === 'medium') {
+          troopPercentage = 0.6; // Send 60% of troops
+        } else {
+          troopPercentage = 0.7; // Send 70% of troops
+        }
+        
+        const troopsToMove = Math.max(1, Math.floor(sourceNode.troops * troopPercentage));
+        
+        // Ensure we leave at least 1 troop behind
+        if (troopsToMove >= sourceNode.troops) {
+          sourceNode.troops = 1;
+        } else {
+          sourceNode.troops -= troopsToMove;
+        }
+        
+        // Resolve battle with adjusted combat bonus based on difficulty - more balanced
+        const combatBonus = {
+          easy: 0.8,  // AI has slight disadvantage
+          medium: 1.0, // Fair combat
+          hard: 1.2   // AI has slight advantage
+        };
+        
+        const adjustedAttackStrength = troopsToMove * combatBonus[difficulty];
+        
+        if (adjustedAttackStrength > targetNode.troops) {
+          // AI wins
+          const remaining = Math.max(1, troopsToMove - Math.floor(targetNode.troops * 0.8));
+          targetNode.team = team;
+          targetNode.troops = remaining;
+        } else {
+          // Defender wins
+          targetNode.troops = Math.max(1, targetNode.troops - Math.floor(troopsToMove * 0.8));
+        }
+        
+        // Remove this node from options for further moves this turn if it has < 2 troops left
+        if (sourceNode.troops < 2) {
+          teamNodes.splice(teamNodes.findIndex(item => item.index === sourceIndex), 1);
+        }
+      }
+    }
+    
+    setNodes(updatedNodes);
+    updateTeamCounts(updatedNodes);
+  };
+  
+  // Apply 3D rotation using simple projection
+  const rotatePoint = (x, y, z) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0, z: 0, scale: 1 };
+    
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    
+    // Rotate around Y axis
+    const cosY = Math.cos(rotation.y);
+    const sinY = Math.sin(rotation.y);
+    const x2 = x * cosY - z * sinY;
+    const z2 = z * cosY + x * sinY;
+    
+    // Rotate around X axis
+    const cosX = Math.cos(rotation.x);
+    const sinX = Math.sin(rotation.x);
+    const y3 = y * cosX - z2 * sinX;
+    const z3 = z2 * cosX + y * sinX;
+    
+    // Apply perspective (simple division by z)
+    const scale = 600 / (600 + z3);
+    
+    return {
+      x: centerX + x2 * scale,
+      y: centerY + y3 * scale,
+      z: z3,
+      scale: scale
+    };
+  };
+  
+  // Render network to canvas
+  const renderNetwork = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw turn number
+    ctx.font = '16px Arial';
+    ctx.fillStyle = '#aaaaaa';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Turn: ${turnNumber}`, 10, 20);
+    
+    if (playerTurn) {
+      ctx.fillStyle = TEAM_COLORS[PLAYER_TEAM].fill;
+      ctx.fillText("Your Turn", 10, 45);
+    } else {
+      ctx.fillStyle = '#aaaaaa';
+      ctx.fillText("AI Turn", 10, 45);
+    }
+    
+    // Draw connections
+    for (const connection of connections) {
+      const nodeA = nodes[connection.nodeA];
+      const nodeB = nodes[connection.nodeB];
+      
+      if (!nodeA || !nodeB) continue;
+      
+      // Apply 3D rotation and perspective
+      const projectedA = rotatePoint(nodeA.position.x, nodeA.position.y, nodeA.position.z);
+      const projectedB = rotatePoint(nodeB.position.x, nodeB.position.y, nodeB.position.z);
+      
+      // Skip lines that are behind the camera
+      if (projectedA.z < -300 || projectedB.z < -300) continue;
+      
+      const startX = projectedA.x;
+      const startY = projectedA.y;
+      const endX = projectedB.x;
+      const endY = projectedB.y;
+      
+      // Adjust line width based on depth
+      const depthScale = (projectedA.scale + projectedB.scale) / 2;
+      
+      // Set connection color based on connected nodes
+      if (nodeA.team === nodeB.team) {
+        // Same team - use team color
+        ctx.strokeStyle = TEAM_COLORS[nodeA.team].stroke;
+      } else if (nodeA.team === NEUTRAL || nodeB.team === NEUTRAL) {
+        // One neutral - use lighter color
+        ctx.strokeStyle = '#999999';
+      } else {
+        // Conflict - yellow
+        ctx.strokeStyle = '#ffff00';
+      }
+      
+      ctx.lineWidth = 1 * depthScale;
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+    }
+    
+    // Draw move arrows from selected node
+    if (selectedNode !== null) {
+      const selectedNodeObj = nodes[selectedNode];
+      const projectedSelected = rotatePoint(
+        selectedNodeObj.position.x, 
+        selectedNodeObj.position.y, 
+        selectedNodeObj.position.z
+      );
+      
+      // Skip if selected node is behind camera
+      if (projectedSelected.z >= -300) {
+        const startX = projectedSelected.x;
+        const startY = projectedSelected.y;
+        
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2 * projectedSelected.scale;
+        ctx.setLineDash([5, 3]);
+        
+        for (const connIndex of selectedNodeObj.connections) {
+          const conn = connections[connIndex];
+          const targetNodeIndex = conn.nodeA === selectedNode ? conn.nodeB : conn.nodeA;
+          const targetNode = nodes[targetNodeIndex];
+          
+          const projectedTarget = rotatePoint(
+            targetNode.position.x, 
+            targetNode.position.y, 
+            targetNode.position.z
+          );
+          
+          // Skip if target node is behind camera
+          if (projectedTarget.z < -300) continue;
+          
+          const endX = projectedTarget.x;
+          const endY = projectedTarget.y;
+          
+          // Draw arrow from selected to target
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+          
+          // Draw arrow head
+          const angle = Math.atan2(endY - startY, endX - startX);
+          const arrowSize = 8 * projectedTarget.scale;
+          ctx.beginPath();
+          ctx.moveTo(endX, endY);
+          ctx.lineTo(
+            endX - arrowSize * Math.cos(angle - Math.PI/6),
+            endY - arrowSize * Math.sin(angle - Math.PI/6)
+          );
+          ctx.lineTo(
+            endX - arrowSize * Math.cos(angle + Math.PI/6),
+            endY - arrowSize * Math.sin(angle + Math.PI/6)
+          );
+          ctx.closePath();
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+        }
+        
+        ctx.setLineDash([]);
+      }
+    }
+    
+    // Draw nodes
+    // First sort nodes by z-depth for proper occlusion
+    const nodeProjections = nodes.map((node, index) => {
+      const projected = rotatePoint(node.position.x, node.position.y, node.position.z);
+      return { node, index, projected };
+    }).sort((a, b) => b.projected.z - a.projected.z); // Sort back-to-front
+    
+    // Then draw them in z-order
+    for (const { node, index, projected } of nodeProjections) {
+      // Skip nodes that are behind the camera
+      if (projected.z < -300) continue;
+      
+      const x = projected.x;
+      const y = projected.y;
+      const scale = projected.scale;
+      const scaledNodeSize = NODE_SIZE * scale;
+      
+      // Check if this node is a valid move target from selected node
+      let isValidTarget = false;
+      if (selectedNode !== null && index !== selectedNode) {
+        const selectedNodeObj = nodes[selectedNode];
+        isValidTarget = selectedNodeObj.connections.some(connIndex => {
+          const conn = connections[connIndex];
+          return (conn.nodeA === selectedNode && conn.nodeB === index) ||
+                 (conn.nodeB === selectedNode && conn.nodeA === index);
+        });
+      }
+      
+      // Draw node highlight/glow based on state
+      if (selectedNode === index) {
+        // Selected node gets white highlight
+        ctx.beginPath();
+        ctx.arc(x, y, scaledNodeSize + 4 * scale, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fill();
+      } else if (isValidTarget) {
+        // Valid targets get yellow highlight
+        ctx.beginPath();
+        ctx.arc(x, y, scaledNodeSize + 4 * scale, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
+        ctx.fill();
+        
+        // Add pulsing effect for valid targets
+        const pulseSize = (2 * Math.sin(Date.now() / 200) + 2) * scale;
+        ctx.beginPath();
+        ctx.arc(x, y, scaledNodeSize + pulseSize, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffff00';
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+      }
+      
+      // Draw the node
+      ctx.beginPath();
+      ctx.arc(x, y, scaledNodeSize, 0, Math.PI * 2);
+      ctx.fillStyle = TEAM_COLORS[node.team].fill;
+      
+      // Node border
+      if (index === selectedNode) {
+        ctx.lineWidth = 3 * scale;
+        ctx.strokeStyle = '#ffffff';
+      } else {
+        ctx.lineWidth = 1 * scale;
+        ctx.strokeStyle = '#000000';
+      }
+      
+      ctx.fill();
+      ctx.stroke();
+      
+      // Draw troop count (scale text based on depth)
+      ctx.font = `bold ${Math.max(8, Math.floor(12 * scale))}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(node.troops.toString(), x, y);
+      
+      // Add node ID for clarity - small number in top right
+      ctx.font = `${Math.max(6, Math.floor(9 * scale))}px Arial`;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.fillText(index.toString(), x + scaledNodeSize - 3 * scale, y - scaledNodeSize + 3 * scale);
+    }
+  };
+  
+  return (
+    <div className="flex flex-col items-center p-4 bg-gray-900 text-white h-full">
+      <h2 className="text-2xl font-bold mb-2">Graph Wars</h2>
+      
+      <div className="mb-4 text-lg">
+        <span className="mr-4">Red Team: <span className="text-red-500 font-bold">{teamCounts[PLAYER_TEAM] || 0}</span></span>
+        <span className="mr-4">Blue Team: <span className="text-blue-500 font-bold">{teamCounts[AI_TEAM_1] || 0}</span></span>
+        <span className="mr-4">Green Team: <span className="text-green-500 font-bold">{teamCounts[AI_TEAM_2] || 0}</span></span>
+        <span className="mr-4">Purple Team: <span className="text-purple-500 font-bold">{teamCounts[AI_TEAM_3] || 0}</span></span>
+      </div>
+      
+      <div className="text-lg mb-2">{gameMessage}</div>
+      
+      <canvas 
+        ref={canvasRef} 
+        width={800} 
+        height={500} 
+        className="border border-gray-700 bg-black mb-4"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        onContextMenu={handleContextMenu}
+      />
+      
+      <div className="flex flex-wrap gap-2 mb-2 justify-center">
+        <button 
+          className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded"
+          onClick={() => setSelectedNode(null)}
+          disabled={!playerTurn || selectedNode === null}
+        >
+          Clear Selection
+        </button>
+        <button 
+          className="bg-green-700 hover:bg-green-600 px-4 py-2 rounded"
+          onClick={endTurn}
+          disabled={!playerTurn}
+        >
+          End Turn
+        </button>
+        <button 
+          className="bg-blue-700 hover:bg-blue-600 px-4 py-2 rounded"
+          onClick={() => setRotation({ x: 0, y: 0 })}
+        >
+          Reset View
+        </button>
+        <button 
+          className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded" 
+          onClick={() => initializeNetwork()}
+        >
+          New Game
+        </button>
+      </div>
+      
+      <div className="flex gap-2 mb-2">
+        <span className="text-gray-300">Difficulty:</span>
+        <button 
+          className={`px-3 py-1 rounded ${difficulty === 'easy' ? 'bg-green-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+          onClick={() => {
+            setDifficulty('easy');
+            initializeNetwork();
+          }}
+        >
+          Easy
+        </button>
+        <button 
+          className={`px-3 py-1 rounded ${difficulty === 'medium' ? 'bg-yellow-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+          onClick={() => {
+            setDifficulty('medium');
+            initializeNetwork();
+          }}
+        >
+          Medium
+        </button>
+        <button 
+          className={`px-3 py-1 rounded ${difficulty === 'hard' ? 'bg-red-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+          onClick={() => {
+            setDifficulty('hard');
+            initializeNetwork();
+          }}
+        >
+          Hard
+        </button>
+      </div>
+      
+      <div className="text-sm text-gray-400 mb-2">
+        Right-click and drag to rotate the network
+      </div>
+      
+      <div className="mt-4 text-sm text-gray-400">
+        <p>How to play: Click on one of your red nodes to select it (needs at least 2 troops).</p>
+        <p>Then click on a connected node to move/attack (highlighted in yellow with arrows).</p>
+        <p>When attacking, half your troops will be sent to battle.</p>
+        <p>Each turn, all nodes gain troops. Click End Turn to let the AI teams take their turns.</p>
+        <p>Conquer the graph by capturing enemy and neutral nodes.</p>
+      </div>
+    </div>
+  );
+};
+
+export default NetworkWarsGame;
