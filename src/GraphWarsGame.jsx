@@ -602,17 +602,18 @@ const GraphWarsGame = () => {
               Multiplayer
             </button>
           </div>
-          <div className="flex flex-wrap gap-2 mb-2 justify-center">
-            {Array.from({ length: 10 }, (_, i) => (
-              <button
-                key={i}
-                className={`px-3 py-1 rounded ${difficulty === i ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'}`}
-                onClick={() => { setDifficulty(i); initializeNetwork(); }}
-              >
-                Level {i}
-              </button>
-            ))}
-          </div>
+	    <div className="flex flex-wrap gap-2 mb-2 justify-center">
+	      <span className="text-lg mr-2">Level:</span>
+	      {Array.from({ length: 10 }, (_, i) => (
+	        <button
+	          key={i}
+	          className={`px-3 py-1 rounded ${difficulty === i ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+	          onClick={() => { setDifficulty(i); initializeNetwork(); }}
+	        >
+	          {i}
+	        </button>
+	      ))}
+	    </div>
         </>
       ) : (
         <>
