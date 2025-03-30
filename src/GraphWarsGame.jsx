@@ -17,16 +17,16 @@ const GraphWarsGame = () => {
   };
 
   const DIFFICULTY_SETTINGS = {
-    0: { nodes: 20, enemies: 1, players: 2, connProb: 0.15, playerTroops: 8, aiTroops: 4 },
-    1: { nodes: 25, enemies: 1, players: 2, connProb: 0.14, playerTroops: 8, aiTroops: 5 },
+    0: { nodes: 10, enemies: 1, players: 2, connProb: 0.15, playerTroops: 8, aiTroops: 4 },
+    1: { nodes: 20, enemies: 1, players: 2, connProb: 0.14, playerTroops: 8, aiTroops: 5 },
     2: { nodes: 30, enemies: 2, players: 3, connProb: 0.13, playerTroops: 7, aiTroops: 5 },
     3: { nodes: 35, enemies: 2, players: 3, connProb: 0.12, playerTroops: 7, aiTroops: 6 },
     4: { nodes: 40, enemies: 3, players: 4, connProb: 0.11, playerTroops: 7, aiTroops: 6 },
     5: { nodes: 45, enemies: 3, players: 4, connProb: 0.10, playerTroops: 6, aiTroops: 7 },
     6: { nodes: 50, enemies: 4, players: 5, connProb: 0.09, playerTroops: 6, aiTroops: 7 },
-    7: { nodes: 55, enemies: 4, players: 5, connProb: 0.08, playerTroops: 6, aiTroops: 8 },
-    8: { nodes: 60, enemies: 5, players: 6, connProb: 0.07, playerTroops: 5, aiTroops: 8 },
-    9: { nodes: 65, enemies: 5, players: 6, connProb: 0.06, playerTroops: 5, aiTroops: 9 }
+    7: { nodes: 55, enemies: 5, players: 6, connProb: 0.08, playerTroops: 8, aiTroops: 8 },
+    8: { nodes: 70, enemies: 6, players: 7, connProb: 0.07, playerTroops: 8, aiTroops: 8 },
+    9: { nodes: 80, enemies: 7, players: 8, connProb: 0.06, playerTroops: 8, aiTroops: 8 }
   };
 
   const [nodes, setNodes] = useState([]);
