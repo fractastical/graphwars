@@ -53,7 +53,10 @@ const GraphWarsGame = () => {
 
   useEffect(() => {
     if (isMultiplayer && !socket) {
-      const newSocket = io('http://localhost:3001');
+    	
+      const newSocket = io('https://graphwars-server.onrender.com/');
+
+      // const newSocket = io('http://localhost:3001');
       setSocket(newSocket);
 
       newSocket.on('gameState', ({ nodes, connections, players, team, turn, difficulty }) => {
