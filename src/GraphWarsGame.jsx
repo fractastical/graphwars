@@ -542,7 +542,7 @@ const GraphWarsGame = () => {
         {Object.entries(teamCounts).map(([team, count]) => (
           TEAM_COLORS[team] && (
             <span key={team} className="mr-4">
-              {TEAM_COLORS[team].name}: <span style={{color: TEAM_COLORS[team].fill}}>{count}</span>
+              &nbsp;{TEAM_COLORS[team].name}: <span style={{color: TEAM_COLORS[team].fill}}>{count}</span>
             </span>
           )
         ))}
